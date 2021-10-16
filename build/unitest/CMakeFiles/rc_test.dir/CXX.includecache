@@ -1,0 +1,16 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+../src/observer/rc.h
+
+/home/tao/Desktop/miniob-contest/unitest/rc_test.cpp
+rc.h
+/home/tao/Desktop/miniob-contest/unitest/rc.h
+iostream
+-
+
