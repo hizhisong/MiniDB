@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include <fcntl.h>
 #include <stdio.h>
 #include <sys/types.h>
+#include <limits.h>
 
 #include <string.h>
 #include <sys/stat.h>
@@ -36,6 +37,7 @@ typedef int PageNum;
 #define BP_BUFFER_SIZE 50
 #define MAX_OPEN_FILE 1024
 
+// size of Page = 4096 bytes = 4KB
 typedef struct {
   PageNum page_num;
   char data[BP_PAGE_DATA_SIZE];
@@ -43,21 +45,21 @@ typedef struct {
 // sizeof(Page) should be equal to BP_PAGE_SIZE
 
 typedef struct {
-  PageNum page_count;
-  int allocated_pages;
+  PageNum page_count;       // 该数据库文件能分配已经开垦的Frame
+  int allocated_pages;      // 该文件已经把开垦的Frame用给多少个Page了 (内存中正在使用的Page数)
 } BPFileSubHeader;
 
 typedef struct {
-  bool dirty;
-  unsigned int pin_count;
-  unsigned long acc_time;
-  int file_desc;
+  bool dirty;               // 是否赃页，frame被释放后不急着把上面Page内容写回disk而是标记该frame为脏的下次给该frame分配新Page时再检查刷回
+  unsigned int pin_count;   // 多少线程占用
+  unsigned long acc_time;   // 最近访问时间
+  int file_desc;            // 打开文件时系统分配的文件描述符
   Page page;
 } Frame;
 
 typedef struct {
-  bool open;
-  Frame *frame;
+  bool open;        // 该Page是否打开可用
+  Frame *frame;     // 给该Page分配的frame
 } BPPageHandle;
 
 class BPFileHandle{
@@ -67,12 +69,13 @@ public:
   }
 
 public:
-  bool bopen;
-  const char *file_name;
-  int file_desc;
-  Frame *hdr_frame;
-  Page *hdr_page;
-  char *bitmap;
+  bool bopen;               // 数据库文件是否打开
+  const char *file_name;    // 文件名
+  int file_desc;            // 文件描述符
+  unsigned long acc_time;   // 最近访问时间
+  Frame *hdr_frame;         // header_frame
+  Page *hdr_page;           // header_page (meta-data of the file)
+  char *bitmap;     // 管理pages在file中的布局 根据page_num查找到page定位
   BPFileSubHeader *file_sub_header;
 } ;
 
@@ -109,9 +112,9 @@ public:
   bool *getAllocated() { return allocated; }
 
 public:
-  int size;
-  Frame * frame = nullptr;
-  bool *allocated = nullptr;
+  int size;                     // Buffer Pool中Frame个数(Buffer Pool大小)
+  Frame * frame = nullptr;      // frame数组，allocated数组下标与frame数组下标一一对应，frame数组值为空则代表还没造出来过
+  bool *allocated = nullptr;    // Buffer Pool中Frame是否被填充Page占用(不是frame是否造出来)
 };
 
 class DiskBufferPool {
@@ -205,8 +208,8 @@ protected:
   RC flush_block(Frame *frame);
 
 private:
-  BPManager bp_manager_;
-  BPFileHandle *open_list_[MAX_OPEN_FILE] = {nullptr};
+  BPManager bp_manager_;        // 有frames数组(实际可操作的buffer pool空间)
+  BPFileHandle *open_list_[MAX_OPEN_FILE] = {nullptr};  // 已打开文件file_id对应的open_list_[file_id]不为空 指向一个BPFileHandle
 };
 
 DiskBufferPool *theGlobalDiskBufferPool();
