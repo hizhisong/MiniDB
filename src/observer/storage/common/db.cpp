@@ -79,6 +79,28 @@ Table *Db::find_table(const char *table_name) const {
   return nullptr;
 }
 
+RC Db::drop_table(const char* table_name) {
+    RC rc = RC::SUCCESS;
+    Table *table = find_table(table_name);
+
+    // 当前DB中是否存在该table
+    if (nullptr == table) {
+        return RC::SCHEMA_TABLE_EXIST;
+    }
+
+    std::string table_file_path = table_meta_file(path_.c_str(), table_name);
+    // 删除与表相关的一切(table meta-data, table index, table data)
+    rc = table->drop(table_name, table_file_path.c_str(), path_.c_str());
+    if (rc != RC::SUCCESS) {
+        return rc;
+    }
+
+    opened_tables_.erase(table_name);
+
+    LOG_INFO("Drop table success. table name=%s", table_name);
+    return RC::SUCCESS;
+}
+
 RC Db::open_all_tables() {
   std::vector<std::string> table_meta_files;
   int ret = common::list_file(path_.c_str(), TABLE_META_FILE_PATTERN, table_meta_files);

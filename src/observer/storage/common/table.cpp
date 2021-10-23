@@ -65,6 +65,7 @@ RC Table::create(const char *path, const char *name, const char *base_dir, int a
   // 使用 table_name.table记录一个表的元数据
   // 判断表文件是否已经存在
 
+  // 尝试打开DB下的某个table的文件 由于一个DB中的表唯一(xxx.table)
   int fd = ::open(path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
   if (-1 == fd) {
     if (EEXIST == errno) {
@@ -96,6 +97,7 @@ RC Table::create(const char *path, const char *name, const char *base_dir, int a
   table_meta_.serialize(fs);
   fs.close();
 
+  // 创建表中的数据的文件
   std::string data_file = std::string(base_dir) + "/" + name + TABLE_DATA_SUFFIX;
   data_buffer_pool_ = theGlobalDiskBufferPool();
   rc = data_buffer_pool_->create_file(data_file.c_str());
@@ -114,7 +116,7 @@ RC Table::create(const char *path, const char *name, const char *base_dir, int a
 RC Table::open(const char *meta_file, const char *base_dir) {
   // 加载元数据文件
   std::fstream fs;
-  std::string meta_file_path = std::string(base_dir) + "/" + meta_file;
+  std::string meta_file_path = std::string(base_dir) + "/" + meta_file;     // meta_file为table_name.table
   fs.open(meta_file_path, std::ios_base::in | std::ios_base::binary);
   if (!fs.is_open()) {
     LOG_ERROR("Failed to open meta file for read. file name=%s, errmsg=%s", meta_file, strerror(errno));
@@ -153,6 +155,35 @@ RC Table::open(const char *meta_file, const char *base_dir) {
     indexes_.push_back(index);
   }
   return rc;
+}
+
+// 删除当前DB的某个table文件
+RC Table::drop(const char *table_name, const char *meta_file, const char *base_dir) {
+    // ========= TODO
+    RC rc = RC::SUCCESS;
+
+    // 从文件系统中删除表的索引、数据( table_name-index_name.index, xxx.data) TODO
+    for (auto &it: indexes_) {
+        std::string index_file = index_data_file(base_dir, table_name, it->index_meta().name());
+        if (remove(index_file.c_str()) != 0) {
+            LOG_PANIC("The index file %s doesn't exist.", index_file.c_str());
+            return RC::GENERIC_ERROR;
+        }
+    }
+
+    std::string data_file = std::string(base_dir) + "/" + table_name + TABLE_DATA_SUFFIX;
+    if (remove(data_file.c_str()) != 0){
+        LOG_PANIC("The data file %s of table %s doesn't exist.", data_file.c_str(), meta_file);
+        return RC::GENERIC_ERROR;
+    }
+
+    // 从文件系统中删除表元数据(miniob/db/db_name/xxx.table)
+    if (remove(meta_file) != 0) {
+        LOG_PANIC("The table file %s doesn't exist.", meta_file);
+        return RC::GENERIC_ERROR;
+    }
+
+    return RC::SUCCESS;
 }
 
 RC Table::commit_insert(Trx *trx, const RID &rid) {
