@@ -38,6 +38,7 @@ Table::~Table() {
   delete record_handler_;
   record_handler_ = nullptr;
 
+  // Table析构时关联关闭文件并free buffer pool
   if (data_buffer_pool_ != nullptr && file_id_ >= 0) {
     data_buffer_pool_->close_file(file_id_);
     data_buffer_pool_ = nullptr;
@@ -159,10 +160,9 @@ RC Table::open(const char *meta_file, const char *base_dir) {
 
 // 删除当前DB的某个table文件
 RC Table::drop(const char *table_name, const char *meta_file, const char *base_dir) {
-    // ========= TODO
     RC rc = RC::SUCCESS;
 
-    // 从文件系统中删除表的索引、数据( table_name-index_name.index, xxx.data) TODO
+    // 从文件系统中删除表的索引、数据( table_name-index_name.index, xxx.data)
     for (auto &it: indexes_) {
         std::string index_file = index_data_file(base_dir, table_name, it->index_meta().name());
         if (remove(index_file.c_str()) != 0) {
@@ -286,12 +286,14 @@ const TableMeta &Table::table_meta() const {
   return table_meta_;
 }
 
+// 开辟一条记录(tuple)的空间 构建起一条记录 通过record_out返回新记录地址
 RC Table::make_record(int value_num, const Value *values, char * &record_out) {
   // 检查字段类型是否一致
   if (value_num + table_meta_.sys_field_num() != table_meta_.field_num()) {
     return RC::SCHEMA_FIELD_MISSING;
   }
 
+  // 检查值类型与表属性类型是否匹配
   const int normal_field_start_index = table_meta_.sys_field_num();
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
@@ -369,7 +371,7 @@ RC Table::scan_record(Trx *trx, ConditionFilter *filter, int limit, void *contex
   return scan_record(trx, filter, limit, (void *)&adapter, scan_record_reader_adapter);
 }
 
-RC Table::scan_record(Trx *trx, ConditionFilter *filter, int limit, void *context, RC (*record_reader)(Record *record, void *context)) {
+RC Table:: scan_record(Trx *trx, ConditionFilter *filter, int limit, void *context, RC (*record_reader)(Record *record, void *context)) {
   if (nullptr == record_reader) {
     return RC::INVALID_ARGUMENT;
   }
@@ -389,7 +391,7 @@ RC Table::scan_record(Trx *trx, ConditionFilter *filter, int limit, void *contex
 
   RC rc = RC::SUCCESS;
   RecordFileScanner scanner;
-  rc = scanner.open_scan(*data_buffer_pool_, file_id_, filter);
+  rc = scanner.open_scan(*data_buffer_pool_, file_id_, filter);     // 进入填充，初始化RecordFileScanner scanner
   if (rc != RC::SUCCESS) {
     LOG_ERROR("failed to open scanner. file id=%d. rc=%d:%s", file_id_, rc, strrc(rc));
     return rc;
@@ -398,9 +400,10 @@ RC Table::scan_record(Trx *trx, ConditionFilter *filter, int limit, void *contex
   int record_count = 0;
   Record record;
   rc = scanner.get_first_record(&record);
+  // 逐个遍历 用scanner获取到的符合条件的record
   for ( ; RC::SUCCESS == rc && record_count < limit; rc = scanner.get_next_record(&record)) {
     if (trx == nullptr || trx->is_visible(this, &record)) {
-      rc = record_reader(&record, context);
+      rc = record_reader(&record, context);     // 填充record deleter context删除record
       if (rc != RC::SUCCESS) {
         break;
       }
@@ -550,8 +553,74 @@ RC Table::create_index(Trx *trx, const char *index_name, const char *attribute_n
   return rc;
 }
 
-RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value, int condition_num, const Condition conditions[], int *updated_count) {
-  return RC::GENERIC_ERROR;
+class RecordUpdater {
+public:
+    RecordUpdater(Table &table, Trx *trx, const char* attribute_name, const Value* value) : table_(table), trx_(trx),
+     attribute_name_(attribute_name), value_(value) { }
+
+     // 对`一条`record进行update
+    RC update_record(Record *record) {
+        RC rc = RC::SUCCESS;
+        Record *rec = record;
+        int field_num = table_.table_meta().field_num();
+
+        const int normal_field_start_index = table_.table_meta().sys_field_num();
+        for (int i = 0; i < field_num; i++) {
+            const FieldMeta *field = table_.table_meta().field(i + normal_field_start_index);
+            if (::strcmp(field->name(), attribute_name_) == 0) {
+                memcpy(rec->data + field->offset(), value_->data, field->len());
+                break;
+            }
+        }
+
+        rc = table_.update_record(trx_, record);
+        if (rc == RC::SUCCESS) {
+            update_count_++;
+        }
+        return rc;
+    }
+
+    int updated_count() const {
+        return update_count_;
+    }
+
+private:
+    Table & table_;
+    Trx *trx_;
+    const char *attribute_name_;
+    const Value *value_;
+    int update_count_ = 0;
+};
+
+// 填充record updater context更新record
+static RC record_reader_update_adapter(Record *record, void *context) {
+    RecordUpdater &record_updater = *(RecordUpdater *)context;
+    return record_updater.update_record(record);
+}
+
+RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value, CompositeConditionFilter* filter, int *updated_count) {
+    RecordUpdater updater(*this, trx, attribute_name, value);
+    RC rc = scan_record(trx, filter, -1, &updater, record_reader_update_adapter);
+    if (updated_count != nullptr) {
+        *updated_count = updater.updated_count();
+    }
+    return rc;
+}
+
+RC Table::update_record(Trx *trx, Record *record) {
+    RC rc = RC::SUCCESS;
+    if (trx != nullptr) {
+        rc = trx->update_record(this, record);
+    } else {
+//        rc = update_entry_of_indexes(record->data, record->rid, false);// 重复代码 refer to commit_delete
+        if (rc != RC::SUCCESS) {
+            LOG_ERROR("Failed to update indexes of record (rid=%d.%d). rc=%d:%s",
+                      record->rid.page_num, record->rid.slot_num, rc, strrc(rc));
+        } else {
+            rc = record_handler_->update_record(record);
+        }
+    }
+    return rc;
 }
 
 class RecordDeleter {
@@ -578,6 +647,7 @@ private:
   int deleted_count_ = 0;
 };
 
+// 填充record deleter context删除record
 static RC record_reader_delete_adapter(Record *record, void *context) {
   RecordDeleter &record_deleter = *(RecordDeleter *)context;
   return record_deleter.delete_record(record);

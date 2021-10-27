@@ -48,6 +48,9 @@ typedef struct _Value {
   void *data;     // value
 } Value;
 
+// select * from t where 12<>age;
+// select * from t where age<>12;
+// select * from t where id=age;
 typedef struct _Condition {
   int left_is_attr;    // TRUE if left-hand side is an attribute
                        // 1时，操作符左边是属性名，0时，是属性值

@@ -26,6 +26,7 @@ unsigned long current_time()
   return tp.tv_sec * 1000 * 1000 * 1000UL + tp.tv_nsec;
 }
 
+// 创建新的buffer pool
 DiskBufferPool *theGlobalDiskBufferPool()
 {
   static DiskBufferPool *instance = new DiskBufferPool();
@@ -104,8 +105,7 @@ RC DiskBufferPool::open_file(const char *file_name, int *file_id)
 
   // 再从open_list_中使用LRU(最久没用且无线程在内存中使用Page)
   int target_index = -1;
-  if (i >= MAX_OPEN_FILE) {
-    if (open_list_[i - 1]) {
+  if (i >= MAX_OPEN_FILE && open_list_[i - 1]) {
         // 从opened-file LRU中把Unpinned的File淘汰回disk
         unsigned long target_time = LONG_MAX;
         for (int j = 0; j < MAX_OPEN_FILE; j++) {
@@ -123,8 +123,9 @@ RC DiskBufferPool::open_file(const char *file_name, int *file_id)
         }
 
         close_file(target_index);      // flush all old pages to the disk && close the file && delete the old file handler
-    }
-  } else {
+  }
+
+  if (target_index == -1) {
     target_index = i - 1;
   }
 
@@ -474,6 +475,7 @@ RC DiskBufferPool::force_all_pages(BPFileHandle *file_handle)
   return RC::SUCCESS;
 }
 
+// 实际拓展(开垦)某个数据库文件规模
 RC DiskBufferPool::flush_block(Frame *frame)
 {
   // The better way is use mmap the block into memory,
