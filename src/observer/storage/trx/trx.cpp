@@ -84,6 +84,24 @@ RC Trx::delete_record(Table *table, Record *record) {
   return rc;
 }
 
+// TODO [Need to be Reviewed]
+RC Trx::update_record(Table *table, Record *record) {
+  RC rc = RC::SUCCESS;
+  start_if_not_started();
+  Operation *old_oper = find_operation(table, record->rid);
+  if (old_oper != nullptr) {
+    if (old_oper->type() == Operation::Type::INSERT) {
+      delete_operation(table, record->rid);
+      return RC::SUCCESS;
+    } else {
+      return RC::GENERIC_ERROR;
+    }
+  }
+  set_record_trx_id(table, *record, trx_id_, true);
+  insert_operation(table, Operation::Type::UPDATE, record->rid);
+  return rc;
+}
+
 void Trx::set_record_trx_id(Table *table, Record &record, int32_t trx_id, bool deleted) const {
   const FieldMeta *trx_field = table->table_meta().trx_field();
   int32_t *ptrx_id = (int32_t*)(record.data + trx_field->offset());
@@ -161,6 +179,10 @@ RC Trx::commit() {
           }
         }
         break;
+        case Operation::Type::UPDATE: {
+
+        }
+        break;
         default: {
           LOG_PANIC("Unknown operation. type=%d", (int)operation.type());
         }
@@ -202,6 +224,10 @@ RC Trx::rollback() {
             LOG_ERROR("Failed to rollback delete operation. rid=%d.%d, rc=%d:%s",
                       rid.page_num, rid.slot_num, rc, strrc(rc));
           }
+        }
+          break;
+        case Operation::Type::UPDATE: {
+
         }
           break;
         default: {

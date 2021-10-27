@@ -27,6 +27,7 @@ class Index;
 class IndexScanner;
 class RecordDeleter;
 class Trx;
+class CompositeConditionFilter;
 
 class Table {
 public:
@@ -59,7 +60,8 @@ public:
   RC drop(const char *table_name, const char *meta_file, const char *base_dir);
   
   RC insert_record(Trx *trx, int value_num, const Value *values);
-  RC update_record(Trx *trx, const char *attribute_name, const Value *value, int condition_num, const Condition conditions[], int *updated_count);
+  RC update_record(Trx *trx, const char *attribute_name, const Value *value, CompositeConditionFilter* condition_filter, int *updated_count);
+  RC update_record(Trx *trx, Record *record);
   RC delete_record(Trx *trx, ConditionFilter *filter, int *deleted_count);
 
   RC scan_record(Trx *trx, ConditionFilter *filter, int limit, void *context, void (*record_reader)(const char *data, void *context));
@@ -96,6 +98,13 @@ private:
   RC delete_entry_of_indexes(const char *record, const RID &rid, bool error_on_not_exists);
 private:
   RC init_record_handler(const char *base_dir);
+
+  /***
+   * 开辟一条记录(tuple)的空间 构建起一条记录 通过record_out返回新记录地址
+   * @param value_num  values数组大小
+   * @param values     一个Value为一个属性值，一条记录的所有属性值组成values数组
+   * @param record_out 返回新开辟记录空间地址
+   */
   RC make_record(int value_num, const Value *values, char * &record_out);
 
 private:

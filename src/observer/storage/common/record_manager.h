@@ -137,7 +137,7 @@ public:
 
 private:
   DiskBufferPool  *   disk_buffer_pool_;
-  int                 file_id_;                    // 参考DiskBufferPool中的fileId
+  int                 file_id_;                    // 参考DiskBufferPool中的fileId(opened-file slots number)
 
   RecordPageHandler   record_page_handler_;        // 目前只有insert record使用
 };

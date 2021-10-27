@@ -24,7 +24,7 @@ struct PageHeader {
   int record_capacity; // 最大记录个数
   int record_real_size; // 每条记录的实际大小
   int record_size; // 每条记录占用实际空间大小(可能对齐)
-  int first_record_offset; // 第一条记录的偏移量
+  int first_record_offset; // 第一条记录的偏移量 存储records的meta-data 当然这里有字节对齐
 };
 
 int align8(int size) {
@@ -156,7 +156,7 @@ RC RecordPageHandler::insert_record(const char *data, RID *rid) {
   // assert index < page_header_->record_capacity
   char *record_data = page_handle_.frame->page.data +
       page_header_->first_record_offset + (index * page_header_->record_size);
-  memcpy(record_data, data, page_header_->record_real_size);
+  memcpy(record_data, data, page_header_->record_real_size);    // Copy data to buffer pool frames' memory from a tmp constructor `data`
 
   RC rc = disk_buffer_pool_->mark_dirty(&page_handle_);
   if (rc != RC::SUCCESS) {
@@ -173,6 +173,7 @@ RC RecordPageHandler::insert_record(const char *data, RID *rid) {
   return RC::SUCCESS;
 }
 
+// 一定是修改好了的rec才能进来并被写到buffer pool对应的frame中
 RC RecordPageHandler::update_record(const Record *rec) {
   RC ret = RC::SUCCESS;
 
@@ -193,8 +194,8 @@ RC RecordPageHandler::update_record(const Record *rec) {
     ret = RC::RECORD_RECORD_NOT_EXIST;
   } else {
     char *record_data = page_handle_.frame->page.data +
-        page_header_->first_record_offset + (rec->rid.slot_num * page_header_->record_size);
-    memcpy(record_data, rec->data, page_header_->record_real_size);
+        page_header_->first_record_offset + (rec->rid.slot_num * page_header_->record_size);    // 一个Page由Page_num、页分配信息(BPFileSubHandler)(这里字节对齐大小为first record 实际为BP_FILE_SUB_HDR_SIZE)与实际存储data组成
+    memcpy(record_data, rec->data, page_header_->record_real_size);    // Copy data to buffer pool frames' memory from a tmp constructor `Record *rec->data`
     ret = disk_buffer_pool_->mark_dirty(&page_handle_);
     if (ret != RC::SUCCESS) {
       LOG_ERROR("Failed to mark page dirty. ret=%s", strrc(ret));
@@ -322,6 +323,7 @@ RecordFileHandler::RecordFileHandler() :
     file_id_(-1) {
 }
 
+// 通过Table::init_record_handler初始化RecordFileHandler的disk_buffer_pool_和file_id_
 RC RecordFileHandler::init(DiskBufferPool &buffer_pool, int file_id) {
 
   RC ret = RC::SUCCESS;
