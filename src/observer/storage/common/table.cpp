@@ -564,13 +564,19 @@ public:
         Record *rec = record;
         int field_num = table_.table_meta().field_num();
 
+        bool flag = false;
         const int normal_field_start_index = table_.table_meta().sys_field_num();
-        for (int i = 0; i < field_num; i++) {
+        for (int i = 0; i < field_num - 1; i++) {
             const FieldMeta *field = table_.table_meta().field(i + normal_field_start_index);
-            if (::strcmp(field->name(), attribute_name_) == 0) {
+            if (field != nullptr && ::strcmp(field->name(), attribute_name_) == 0) {
                 memcpy(rec->data + field->offset(), value_->data, field->len());
+                flag = true;
                 break;
             }
+        }
+
+        if (flag == false) {
+            return RC::GENERIC_ERROR;
         }
 
         rc = table_.update_record(trx_, record);
