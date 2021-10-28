@@ -569,8 +569,10 @@ public:
         for (int i = 0; i < field_num - 1; i++) {
             const FieldMeta *field = table_.table_meta().field(i + normal_field_start_index);
             if (field != nullptr && ::strcmp(field->name(), attribute_name_) == 0) {
-                memcpy(rec->data + field->offset(), value_->data, field->len());
-                flag = true;
+                if (field->type() == value_->type) {
+                    memcpy(rec->data + field->offset(), value_->data, field->len());
+                    flag = true;
+                }
                 break;
             }
         }
