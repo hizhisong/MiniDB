@@ -15,6 +15,52 @@ extern double atof();
 #endif // YYDEBUG
 
 #define RETURN_TOKEN(token) debug_printf("%s\n",#token);return token
+
+int splitStr2int(char* str) {
+    int y = -1, m = -1, d = -1;
+    int rtn = -1;
+    sscanf(str, "%d-%d-%d", &y, &m, &d);
+    if (y >= 1970 && y <= 2038 ) {
+        rtn = y;
+    } else {
+        return -1;
+    }
+
+    if (m >= 1 && m <= 12) {
+        rtn *= 100;
+        rtn += m;
+    } else {
+        return -1;
+    }
+
+    if (d >=1  && d <= 31) {
+        rtn *= 100;
+        if (m == 2) {
+            if ( ((y % 4 == 0) && (y % 100 != 0)) || y % 400 == 0) {  // 闰年
+                if (d > 29) {
+                    return -1;
+                }
+            } else {
+                if (d > 28) {
+                    return -1;
+                }
+            }
+        } else if (m == 4 || m == 6 || m == 9 || m == 11) {        // 小月
+            if (d > 30) {
+                return -1;
+            }
+        } else {
+            if (d > 31) {
+                return -1;
+            }
+        }
+        rtn += d;
+    } else {
+        return -1;
+    }
+
+    return rtn;
+}
 %}
 
 /* Prevent the need for linking with -lfl */
@@ -27,6 +73,7 @@ DIGIT            [0-9]+
 
 ID               [A-Za-z_]+[A-Za-z0-9_]*
 DOT              \.
+HYPHEN           \-
 QUOTE            [\'\"]
 %x STR
 
@@ -37,6 +84,7 @@ QUOTE            [\'\"]
 
 [\-]?{DIGIT}+					                   yylval->number=atoi(yytext); RETURN_TOKEN(NUMBER);
 [\-]?{DIGIT}+{DOT}{DIGIT}+				       yylval->floats=(float)(atof(yytext)); RETURN_TOKEN(FLOAT);
+[\-]?{DIGIT}+{HYPHEN}+{DIGIT}+{HYPHEN}+{DIGIT}+     yylval->date=splitStr2int(yytext); RETURN_TOKEN(DATE);
 
 ";"                 	 				           RETURN_TOKEN(SEMICOLON);
 {DOT}                 					         RETURN_TOKEN(DOT);
@@ -68,6 +116,7 @@ QUOTE            [\'\"]
 [Ii][Nn][Tt]					                   RETURN_TOKEN(INT_T);
 [Cc][Hh][Aa][Rr]				                 RETURN_TOKEN(STRING_T);
 [Ff][Ll][Oo][Aa][Tt]			               RETURN_TOKEN(FLOAT_T);
+[Dd][Aa][Tt][Ee]                               RETURN_TOKEN(DATE_T);
 [Ll][Oo][Aa][Dd]			                   RETURN_TOKEN(LOAD);
 [Dd][Aa][Tt][Aa]	                       RETURN_TOKEN(DATA);
 [Ii][Nn][Ff][Ii][Ll][Ee]                 RETURN_TOKEN(INFILE);
