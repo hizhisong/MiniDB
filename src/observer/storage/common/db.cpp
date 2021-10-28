@@ -85,7 +85,7 @@ RC Db::drop_table(const char* table_name) {
 
     // 当前DB中是否存在该table
     if (nullptr == table) {
-        return RC::SCHEMA_TABLE_EXIST;
+        return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
     std::string table_file_path = table_meta_file(path_.c_str(), table_name);
