@@ -91,5 +91,31 @@ private:
   std::string value_;
 };
 
+class DateValue : public TupleValue {
+public:
+    explicit DateValue(int date_int_format): date_int_format_(date_int_format) {}
+
+    void to_string(std::ostream &os) const override {
+        char date_str[11] = "0000-00-00";
+        int date_int = date_int_format_;
+        for (int i = 9; i >= 0; i--) {
+            if (date_str[i] != '-') {
+                int tmp = date_int % 10;
+                date_int /= 10;
+                date_str[i] = tmp + '0';
+            }
+        }
+        os << date_str;
+    }
+
+    int compare(const TupleValue &other) const override {
+        const DateValue & date_other = (const DateValue &)other;
+        return date_int_format_ - date_other.date_int_format_;
+    }
+
+private:
+    int date_int_format_;
+};
+
 
 #endif //__OBSERVER_SQL_EXECUTOR_VALUE_H_

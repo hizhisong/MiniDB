@@ -257,10 +257,34 @@ RC Table::insert_record(Trx *trx, Record *record) {
   }
   return rc;
 }
+
+RC Table::check_record_values_valid(const Value& value) const {
+    RC rc = RC::SUCCESS;
+    switch (value.type) {
+        case DATES:{
+            if (*(int*)value.data == -1) {
+                rc = RC::GENERIC_ERROR;
+            }
+        }
+        break;
+
+        default:
+        break;
+    }
+
+    return rc;
+}
+
 RC Table::insert_record(Trx *trx, int value_num, const Value *values) {
   if (value_num <= 0 || nullptr == values ) {
     LOG_ERROR("Invalid argument. value num=%d, values=%p", value_num, values);
     return RC::INVALID_ARGUMENT;
+  }
+
+  for (int i = 0; i < value_num; i++) {
+      if (check_record_values_valid(values[i]) == RC::GENERIC_ERROR) {
+          return RC::GENERIC_ERROR;
+      }
   }
 
   char *record_data;

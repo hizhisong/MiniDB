@@ -27,6 +27,7 @@ DIGIT            [0-9]+
 
 ID               [A-Za-z_]+[A-Za-z0-9_]*
 DOT              \.
+HYPHEN           \-
 QUOTE            [\'\"]
 %x STR
 
@@ -37,6 +38,7 @@ QUOTE            [\'\"]
 
 [\-]?{DIGIT}+					                   yylval->number=atoi(yytext); RETURN_TOKEN(NUMBER);
 [\-]?{DIGIT}+{DOT}{DIGIT}+				       yylval->floats=(float)(atof(yytext)); RETURN_TOKEN(FLOAT);
+[\-]?{QUOTE}+{DIGIT}+{HYPHEN}+{DIGIT}+{HYPHEN}+{DIGIT}+{QUOTE}+     yylval->date=yytext; RETURN_TOKEN(DATE);
 
 ";"                 	 				           RETURN_TOKEN(SEMICOLON);
 {DOT}                 					         RETURN_TOKEN(DOT);
@@ -68,6 +70,7 @@ QUOTE            [\'\"]
 [Ii][Nn][Tt]					                   RETURN_TOKEN(INT_T);
 [Cc][Hh][Aa][Rr]				                 RETURN_TOKEN(STRING_T);
 [Ff][Ll][Oo][Aa][Tt]			               RETURN_TOKEN(FLOAT_T);
+[Dd][Aa][Tt][Ee]                               RETURN_TOKEN(DATE_T);
 [Ll][Oo][Aa][Dd]			                   RETURN_TOKEN(LOAD);
 [Dd][Aa][Tt][Aa]	                       RETURN_TOKEN(DATA);
 [Ii][Nn][Ff][Ii][Ll][Ee]                 RETURN_TOKEN(INFILE);
