@@ -125,8 +125,7 @@ void ExecuteStage::handle_request(common::StageEvent *event) {
     case SCF_SELECT: { // select
       RC rc = do_select(current_db, sql, exe_event->sql_event()->session_event());
       if (rc != RC::SUCCESS) {
-          char response[] = "FAILURE\n";
-          session_event->set_response(response);
+          session_event->set_response("FAILURE\n");
       }
       exe_event->done_immediate();
     }

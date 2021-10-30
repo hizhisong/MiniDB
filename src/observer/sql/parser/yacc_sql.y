@@ -112,7 +112,7 @@ ParserContext *get_context(yyscan_t scanner)
   int number;
   float floats;
   char *position;
-  int date;
+  char*  date;
 }
 
 %token <number> NUMBER
@@ -313,13 +313,12 @@ value:
   		value_init_float(&CONTEXT->values[CONTEXT->value_length++], $1);
 		}
     |SSS {
-			$1 = substr($1,1,strlen($1)-2);
-  		// TODO DATE
+		$1 = substr($1,1,strlen($1)-2);
   		value_init_string(&CONTEXT->values[CONTEXT->value_length++], $1);
 		}
     |DATE {
-    	value_init_date(&CONTEXT->values[CONTEXT->value_length++], $1);
-    }
+    		value_init_date(&CONTEXT->values[CONTEXT->value_length++], $1);
+    		}
     ;
     
 delete:		/*  delete 语句的语法解析树*/

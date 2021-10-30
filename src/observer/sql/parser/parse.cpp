@@ -22,6 +22,58 @@ RC parse(char *st, Query *sqln);
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
+
+int splitStr2int(const char* str) {
+    int y = -1, m = -1, d = -1;
+    int rtn = -1;
+    char* str_ = strdup(str);
+    str_[0] = str_[strlen(str_) - 1] = ' ';
+
+//    printf("%s\n%s\n", str, str_);
+
+    sscanf(str_, "%d-%d-%d", &y, &m, &d);
+    if (y >= 1970 && y <= 2038 ) {
+        rtn = y;
+    } else {
+        return -1;
+    }
+
+    if (m >= 1 && m <= 12) {
+        rtn *= 100;
+        rtn += m;
+    } else {
+        return -1;
+    }
+
+    if (d >=1  && d <= 31) {
+        rtn *= 100;
+        if (m == 2) {
+            if ( ((y % 4 == 0) && (y % 100 != 0)) || y % 400 == 0) {  // 闰年
+                if (d > 29) {
+                    return -1;
+                }
+            } else {
+                if (d > 28) {
+                    return -1;
+                }
+            }
+        } else if (m == 4 || m == 6 || m == 9 || m == 11) {        // 小月
+            if (d > 30) {
+                return -1;
+            }
+        } else {
+            if (d > 31) {
+                return -1;
+            }
+        }
+        rtn += d;
+    } else {
+        return -1;
+    }
+    free(str_);
+    return rtn;
+}
+
 void relation_attr_init(RelAttr *relation_attr, const char *relation_name, const char *attribute_name) {
   if (relation_name != nullptr) {
     relation_attr->relation_name = strdup(relation_name);
@@ -52,10 +104,13 @@ void value_init_string(Value *value, const char *v) {
   value->type = CHARS;
   value->data = strdup(v);
 }
-void value_init_date(Value* value, int v) {
+void value_init_date(Value* value, const char* v) {
+//  printf("value_init_date: %s\n", v);
+  int ans = splitStr2int(v);
+//  printf("ANS %d\n", ans);
   value->type = DATES;
-  value->data = malloc(sizeof(v));
-  memcpy(value->data, &v, sizeof(v));
+  value->data = malloc(sizeof(ans));
+  memcpy(value->data, &ans, sizeof(ans));
 }
 void value_destroy(Value *value) {
   value->type = UNDEFINED;
@@ -95,6 +150,7 @@ void condition_destroy(Condition *condition) {
 }
 
 void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t length) {
+//    printf("attr_info_init: %d\n", type);
   attr_info->name = strdup(name);
   attr_info->type = type;
   attr_info->length = length;
@@ -205,6 +261,7 @@ void updates_destroy(Updates *updates) {
 }
 
 void create_table_append_attribute(CreateTable *create_table, AttrInfo *attr_info) {
+//    printf("create_table_append_attribute: %d\n", attr_info->type);
   create_table->attributes[create_table->attribute_count++] = *attr_info;
 }
 void create_table_init_name(CreateTable *create_table, const char *relation_name) {
