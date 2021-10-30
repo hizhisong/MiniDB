@@ -107,6 +107,8 @@ private:
    */
   RC make_record(int value_num, const Value *values, char * &record_out);
 
+  RC check_record_values_valid(const Value& value) const;
+
 private:
   Index *find_index(const char *index_name) const;
 

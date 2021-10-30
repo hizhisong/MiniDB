@@ -23,6 +23,7 @@ See the Mulan PSL v2 for more details. */
 
 class Table;
 
+// 一条Tuple的所有属性值集合(vector)
 class Tuple {
 public:
   Tuple() = default;
@@ -39,8 +40,9 @@ public:
   void add(int value);
   void add(float value);
   void add(const char *s, int len);
+  void add_date(int value);
 
-  const std::vector<std::shared_ptr<TupleValue>> &values() const {
+        const std::vector<std::shared_ptr<TupleValue>> &values() const {
     return values_;
   }
 
@@ -60,6 +62,7 @@ private:
   std::vector<std::shared_ptr<TupleValue>>  values_;
 };
 
+// 一条Tuple`某一个属性`的相关信息
 class TupleField {
 public:
   TupleField(AttrType type, const char *table_name, const char *field_name) :
@@ -84,6 +87,7 @@ private:
   std::string field_name_;
 };
 
+// 一条Tuple`所有用户可见属性`的相关信息 的集合(属性们可能来自不同表)
 class TupleSchema {
 public:
   TupleSchema() = default;
@@ -114,6 +118,7 @@ private:
   std::vector<TupleField> fields_;
 };
 
+// 同一个表中的Tuple集合
 class TupleSet {
 public:
   TupleSet() = default;
@@ -147,6 +152,7 @@ private:
   TupleSchema schema_;
 };
 
+// 一个Table与其对应的记录的封装
 class TupleRecordConverter {
 public:
   TupleRecordConverter(Table *table, TupleSet &tuple_set);
