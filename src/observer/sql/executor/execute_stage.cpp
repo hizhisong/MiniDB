@@ -299,12 +299,12 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
     // 进行笛卡尔积，填充值
     std::vector<const Tuple*> path;
     do_join_dfs(tuple_sets, tuple_sets.size()-1, path, tuple_set);
+
+    tuple_set.print(ss, true);
   } else {
     tuple_set = std::move(tuple_sets.front());
+    tuple_set.print(ss, false);
   }
-
-  // 当前只查询一张表，直接返回结果即可
-  tuple_set.print(ss);
 
   for (SelectExeNode *& tmp_node: select_nodes) {
     delete tmp_node;
