@@ -94,6 +94,10 @@ void TupleSchema::add_if_not_exists(AttrType type, const char *table_name, const
   add(type, table_name, field_name);
 }
 
+void TupleSchema::merge(const TupleSchema &other) {
+  fields_.insert(fields_.end(), other.fields_.begin(), other.fields_.end());
+}
+
 void TupleSchema::append(const TupleSchema &other) {
   fields_.reserve(fields_.size() + other.fields_.size());
   for (const auto &field: other.fields_) {

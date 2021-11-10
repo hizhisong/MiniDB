@@ -42,6 +42,10 @@ public:
   void add(const char *s, int len);
   void add_date(int value);
 
+  void merge(const Tuple &other) {
+    values_.insert(values_.end(), other.values_.begin(), other.values_.end());
+  }
+
   const std::vector<std::shared_ptr<TupleValue>> &values() const {
     return values_;
   }
@@ -95,7 +99,7 @@ public:
 
   void add(AttrType type, const char *table_name, const char *field_name);
   void add_if_not_exists(AttrType type, const char *table_name, const char *field_name);
-  // void merge(const TupleSchema &other);
+  void merge(const TupleSchema &other);
   void append(const TupleSchema &other);
 
   const std::vector<TupleField> &fields() const {
