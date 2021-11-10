@@ -120,6 +120,7 @@ StageEvent *ParseStage::handle_request(StageEvent *event) {
   }
 
   RC ret = parse(sql.c_str(), result);
+  // printf("%d %d===", result->sstr.selection.aggregations[0], result->sstr.selection.aggregations[1]);
   if (ret != RC::SUCCESS) {
     // set error information to event
     const char *error = result->sstr.errors != nullptr ? result->sstr.errors : "Unknown error";

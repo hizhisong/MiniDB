@@ -39,6 +39,9 @@ typedef enum {
   NO_OP
 } CompOp;
 
+// 聚合运算类型
+typedef enum { UNVALID, MAX, MIN, COUNT, AVG } AggreType;
+
 //属性值类型
 typedef enum { UNDEFINED, CHARS, INTS, FLOATS, DATES } AttrType;
 
@@ -66,6 +69,7 @@ typedef struct _Condition {
 // struct of select
 typedef struct {
   size_t    attr_num;               // Length of attrs in Select clause
+  AggreType aggregations[MAX_NUM];  // aggregations in Select clause
   RelAttr   attributes[MAX_NUM];    // attrs in Select clause
   size_t    relation_num;           // Length of relations in Fro clause
   char *    relations[MAX_NUM];     // relations in From clause
@@ -201,6 +205,8 @@ void selects_append_attribute(Selects *selects, RelAttr *rel_attr);
 void selects_append_relation(Selects *selects, const char *relation_name);
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num);
 void selects_destroy(Selects *selects);
+
+void selects_aggregation_add(Selects *selects, int aggre, int index);
 
 void inserts_init(Inserts *inserts, const char *relation_name, Value values[], size_t value_num);
 void inserts_destroy(Inserts *inserts);

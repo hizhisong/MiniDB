@@ -215,9 +215,28 @@ void end_trx_if_need(Session *session, Trx *trx, bool all_right) {
     }
   }
 }
+void do_join_dfs(std::vector<TupleSet>& tuple_sets, int level, std::vector<const Tuple*> path_for_makeARecord, TupleSet& result) {
+    // 递归终点
+    if (path_for_makeARecord.size() >= tuple_sets.size()) {   // if 终点
+        Tuple tuple;
+        for (long unsigned int i = 0; i < path_for_makeARecord.size(); i++) {
+            tuple.merge(*path_for_makeARecord[i]);
+        }
+        result.add(std::move(tuple));       // Add a tuple to final return
+        return;
+    }
+
+    // 遍历一个Table的所有Tuple
+    for (int i = 0; i < tuple_sets[level].size(); i++) {
+        path_for_makeARecord.push_back(&tuple_sets[level].get(i)); // push an original tuple from tuple_sets
+        do_join_dfs(tuple_sets, level-1, path_for_makeARecord, result);
+        path_for_makeARecord.pop_back();
+    }
+}
 
 // 这里没有对输入的某些信息做合法性校验，比如查询的列名、where条件中的列名等，没有做必要的合法性校验
 // 需要补充上这一部分. 校验部分也可以放在resolve，不过跟execution放一起也没有关系
+// 单表多表查询逻辑合并
 RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_event) {
 
   RC rc = RC::SUCCESS;
@@ -248,6 +267,7 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
   }
 
   std::vector<TupleSet> tuple_sets;
+  std::vector<std::vector<std::string>> tupleSets;
   for (SelectExeNode *&node: select_nodes) {
     TupleSet tuple_set;
     rc = node->execute(tuple_set);
@@ -262,13 +282,29 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
     }
   }
 
+  TupleSet tuple_set;
   std::stringstream ss;
   if (tuple_sets.size() > 1) {
     // 本次查询了多张表，需要做join操作
+
+    // 制作新属性表表头
+    TupleSchema tuple_schema;
+    for (int i = tuple_sets.size()-1; i >= 0; i--) {
+        tuple_schema.merge(tuple_sets[i].get_schema());
+    }
+    tuple_set.set_schema(tuple_schema);
+
+//    tuple_set.get_schema().print(ss);
+
+    // 进行笛卡尔积，填充值
+    std::vector<const Tuple*> path;
+    do_join_dfs(tuple_sets, tuple_sets.size()-1, path, tuple_set);
   } else {
-    // 当前只查询一张表，直接返回结果即可
-    tuple_sets.front().print(ss);
+    tuple_set = std::move(tuple_sets.front());
   }
+
+  // 当前只查询一张表，直接返回结果即可
+  tuple_set.print(ss);
 
   for (SelectExeNode *& tmp_node: select_nodes) {
     delete tmp_node;

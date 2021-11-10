@@ -16,6 +16,7 @@ typedef struct ParserContext {
   size_t condition_length;
   size_t from_length;
   size_t value_length;
+  AggreType aggregations[MAX_NUM];
   Value values[MAX_NUM];
   Condition conditions[MAX_NUM];
   CompOp comp;
@@ -97,6 +98,10 @@ ParserContext *get_context(yyscan_t scanner)
         LOAD
         DATA
         INFILE
+        _MAX
+        _MIN
+        _COUNT
+        _AVG
         EQ
         LT
         GT
@@ -361,39 +366,179 @@ select:				/*  select 语句的语法解析树*/
 	;
 
 select_attr:
-    STAR {  
+    STAR {
 			RelAttr attr;
 			relation_attr_init(&attr, NULL, "*");
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
-		}
+    }
     | ID attr_list {
 			RelAttr attr;
 			relation_attr_init(&attr, NULL, $1);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 		}
-  	| ID DOT ID attr_list {
+    | ID DOT ID attr_list {
 			RelAttr attr;
 			relation_attr_init(&attr, $1, $3);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 		}
-    ;
+	| _MAX LBRACE STAR RBRACE attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, "*");
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_aggregation_add(&CONTEXT->ssql->sstr.selection, 1, CONTEXT->select_length);
+		}
+	| _MAX LBRACE ID RBRACE attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, $3);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_aggregation_add(&CONTEXT->ssql->sstr.selection, 1, CONTEXT->select_length);
+		}
+	| _MAX LBRACE ID DOT ID RBRACE attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, $3, $5);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_aggregation_add(&CONTEXT->ssql->sstr.selection, 1, CONTEXT->select_length);	
+		}
+	| _COUNT LBRACE STAR RBRACE attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, "*");
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_aggregation_add(&CONTEXT->ssql->sstr.selection, 3, CONTEXT->select_length);
+		}
+	| _COUNT LBRACE ID RBRACE attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, $3);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_aggregation_add(&CONTEXT->ssql->sstr.selection, 3, CONTEXT->select_length);
+		}
+	| _COUNT LBRACE ID DOT ID RBRACE attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, $3, $5);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_aggregation_add(&CONTEXT->ssql->sstr.selection, 3, CONTEXT->select_length);
+		}
+	| _MIN LBRACE STAR RBRACE attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, "*");
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_aggregation_add(&CONTEXT->ssql->sstr.selection, 2, CONTEXT->select_length);
+		}
+	| _MIN LBRACE ID RBRACE attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, $3);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_aggregation_add(&CONTEXT->ssql->sstr.selection, 2, CONTEXT->select_length);
+		}
+	| _MIN LBRACE ID DOT ID RBRACE attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, $3, $5);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_aggregation_add(&CONTEXT->ssql->sstr.selection, 2, CONTEXT->select_length);
+		}
+	| _AVG LBRACE STAR RBRACE attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, "*");
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_aggregation_add(&CONTEXT->ssql->sstr.selection, 4, CONTEXT->select_length);
+		}
+	| _AVG LBRACE ID RBRACE attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, $3);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_aggregation_add(&CONTEXT->ssql->sstr.selection, 4, CONTEXT->select_length);
+		}
+	| _AVG LBRACE ID DOT ID RBRACE attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, $3, $5);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_aggregation_add(&CONTEXT->ssql->sstr.selection, 4, CONTEXT->select_length);
+		}
+	;
 attr_list:
     /* empty */
     | COMMA ID attr_list {
 			RelAttr attr;
 			relation_attr_init(&attr, NULL, $2);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
-     	  // CONTEXT->ssql->sstr.selection.attributes[CONTEXT->select_length].relation_name = NULL;
-        // CONTEXT->ssql->sstr.selection.attributes[CONTEXT->select_length++].attribute_name=$2;
       }
     | COMMA ID DOT ID attr_list {
 			RelAttr attr;
 			relation_attr_init(&attr, $2, $4);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
-        // CONTEXT->ssql->sstr.selection.attributes[CONTEXT->select_length].attribute_name=$4;
-        // CONTEXT->ssql->sstr.selection.attributes[CONTEXT->select_length++].relation_name=$2;
   	  }
-  	;
+	| COMMA _MAX LBRACE STAR RBRACE attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, "*");
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_aggregation_add(&CONTEXT->ssql->sstr.selection, 1, CONTEXT->select_length);
+		}
+	| COMMA _MAX LBRACE ID RBRACE attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, $4);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_aggregation_add(&CONTEXT->ssql->sstr.selection, 1, CONTEXT->select_length);	
+		}
+	| COMMA _MAX LBRACE ID DOT ID RBRACE attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, $4, $6);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_aggregation_add(&CONTEXT->ssql->sstr.selection, 1, CONTEXT->select_length);	
+		}
+	| COMMA _COUNT LBRACE STAR RBRACE attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, "*");
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_aggregation_add(&CONTEXT->ssql->sstr.selection, 3, CONTEXT->select_length);	
+		}
+	| COMMA _COUNT LBRACE ID RBRACE attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, $4);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_aggregation_add(&CONTEXT->ssql->sstr.selection, 3, CONTEXT->select_length);	
+		}
+	| COMMA _COUNT LBRACE ID DOT ID RBRACE attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, $4, $6);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_aggregation_add(&CONTEXT->ssql->sstr.selection, 3, CONTEXT->select_length);	
+		}
+	| COMMA _MIN LBRACE STAR RBRACE attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, "*");
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_aggregation_add(&CONTEXT->ssql->sstr.selection, 2, CONTEXT->select_length);	
+		}
+	| COMMA _MIN LBRACE ID RBRACE attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, $4);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_aggregation_add(&CONTEXT->ssql->sstr.selection, 2, CONTEXT->select_length);	
+		}
+	| COMMA _MIN LBRACE ID DOT ID RBRACE attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, $4, $6);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_aggregation_add(&CONTEXT->ssql->sstr.selection, 2, CONTEXT->select_length);	
+		}
+	| COMMA _AVG LBRACE STAR RBRACE attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, "*");
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_aggregation_add(&CONTEXT->ssql->sstr.selection, 4, CONTEXT->select_length);	
+		}
+	| COMMA _AVG LBRACE ID RBRACE attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, $4);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_aggregation_add(&CONTEXT->ssql->sstr.selection, 4, CONTEXT->select_length);	
+		}
+	| COMMA _AVG LBRACE ID DOT ID RBRACE attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, $4, $6);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_aggregation_add(&CONTEXT->ssql->sstr.selection, 4, CONTEXT->select_length);	
+		}
+	;
 
 rel_list:
     /* empty */

@@ -164,6 +164,33 @@ void selects_init(Selects *selects, ...);
 void selects_append_attribute(Selects *selects, RelAttr *rel_attr) {
   selects->attributes[selects->attr_num++] = *rel_attr;
 }
+
+void selects_aggregation_add(Selects *selects, int aggre, int index) {
+  AggreType ag = UNVALID;
+  switch (aggre)
+  {
+  case 1:
+    ag = MAX;
+    break;
+  
+  case 2:
+    ag = MIN;
+  break;
+
+  case 3:
+    ag = COUNT;
+  break;
+  
+  case 4:
+    ag = AVG;
+   break;
+
+  default:
+    break;
+  }
+  selects->aggregations[index] = ag;
+}
+
 void selects_append_relation(Selects *selects, const char *relation_name) {
   selects->relations[selects->relation_num++] = strdup(relation_name);
 }

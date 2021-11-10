@@ -85,20 +85,24 @@ extern int yydebug;
     LOAD = 291,
     DATA = 292,
     INFILE = 293,
-    EQ = 294,
-    LT = 295,
-    GT = 296,
-    LE = 297,
-    GE = 298,
-    NE = 299,
-    NUMBER = 300,
-    FLOAT = 301,
-    ID = 302,
-    PATH = 303,
-    SSS = 304,
-    STAR = 305,
-    STRING_V = 306,
-    DATE = 307
+    _MAX = 294,
+    _MIN = 295,
+    _COUNT = 296,
+    _AVG = 297,
+    EQ = 298,
+    LT = 299,
+    GT = 300,
+    LE = 301,
+    GE = 302,
+    NE = 303,
+    NUMBER = 304,
+    FLOAT = 305,
+    ID = 306,
+    PATH = 307,
+    SSS = 308,
+    STAR = 309,
+    STRING_V = 310,
+    DATE = 311
   };
 #endif
 /* Tokens.  */
@@ -138,26 +142,30 @@ extern int yydebug;
 #define LOAD 291
 #define DATA 292
 #define INFILE 293
-#define EQ 294
-#define LT 295
-#define GT 296
-#define LE 297
-#define GE 298
-#define NE 299
-#define NUMBER 300
-#define FLOAT 301
-#define ID 302
-#define PATH 303
-#define SSS 304
-#define STAR 305
-#define STRING_V 306
-#define DATE 307
+#define _MAX 294
+#define _MIN 295
+#define _COUNT 296
+#define _AVG 297
+#define EQ 298
+#define LT 299
+#define GT 300
+#define LE 301
+#define GE 302
+#define NE 303
+#define NUMBER 304
+#define FLOAT 305
+#define ID 306
+#define PATH 307
+#define SSS 308
+#define STAR 309
+#define STRING_V 310
+#define DATE 311
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 107 "yacc_sql.y"
+#line 112 "yacc_sql.y"
 
   struct _Attr *attr;
   struct _Condition *condition1;
@@ -168,7 +176,7 @@ union YYSTYPE
   char *position;
   char*  date;
 
-#line 172 "yacc_sql.tab.h"
+#line 180 "yacc_sql.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;
