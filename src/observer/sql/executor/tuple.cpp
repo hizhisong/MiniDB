@@ -16,10 +16,10 @@ See the Mulan PSL v2 for more details. */
 #include "storage/common/table.h"
 #include "common/log/log.h"
 
-Tuple::Tuple(const Tuple &other) {
-  LOG_PANIC("Copy constructor of tuple is not supported");
-  exit(1);
-}
+//Tuple::Tuple(const Tuple &other) {
+//  LOG_PANIC("Copy constructor of tuple is not supported");
+//  exit(1);
+//}
 
 Tuple::Tuple(Tuple &&other) noexcept : values_(std::move(other.values_)) {
 }
@@ -116,6 +116,17 @@ int TupleSchema::index_of_field(const char *table_name, const char *field_name) 
   return -1;
 }
 
+int TupleSchema::index_of_field_for_same_table(const char *field_name) const {
+  const int size = fields_.size();
+  for (int i = 0; i < size; i++) {
+    const TupleField &field = fields_[i];
+    if (0 == strcmp(field.field_name(), field_name)) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 void TupleSchema::print(std::ostream &os, bool singleTable) const {
   if (fields_.empty()) {
     os << "No schema";
@@ -163,6 +174,10 @@ TupleSet &TupleSet::operator=(TupleSet &&other) {
 
 void TupleSet::add(Tuple &&tuple) {
   tuples_.emplace_back(std::move(tuple));
+}
+
+std::vector<Tuple>::const_iterator TupleSet::remove(std::vector<Tuple>::const_iterator pos){
+  return tuples_.erase(pos);
 }
 
 void TupleSet::clear() {

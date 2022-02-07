@@ -234,6 +234,16 @@ void do_join_dfs(std::vector<TupleSet>& tuple_sets, int level, std::vector<const
     }
 }
 
+bool match_table(const Selects &selects, const char *table_name_in_condition,  const char* const *table_name_to_match);
+
+Record make_virtual_record(const char* data) {
+    Record record;
+    memset(&record, 0, sizeof(Record));
+    record.data = (char*)(data);
+
+    return record;
+}
+
 // 这里没有对输入的某些信息做合法性校验，比如查询的列名、where条件中的列名等，没有做必要的合法性校验
 // 需要补充上这一部分. 校验部分也可以放在resolve，不过跟execution放一起也没有关系
 // 单表多表查询逻辑合并
@@ -285,8 +295,10 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
   TupleSet tuple_set;
   std::stringstream ss;
   if (tuple_sets.size() > 1) {
-    // 本次查询了多张表，需要做join操作
+      // TODO 多张表合并后表如果都为空
+      // TODO float过滤有问题
 
+    // 本次查询了多张表，需要做join操作
     // 制作新属性表表头
     TupleSchema tuple_schema;
     for (int i = tuple_sets.size()-1; i >= 0; i--) {
@@ -300,9 +312,115 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
     std::vector<const Tuple*> path;
     do_join_dfs(tuple_sets, tuple_sets.size()-1, path, tuple_set);
 
-    tuple_set.print(ss, true);
+    // 单表中两个属性间的比较 过滤-where
+    // 找出仅与此表相关的过滤条件, 或者都是值的过滤条件
+    DefaultConditionFilter* condition_filters[selects.condition_num];
+    int condition_filters_count = 0, connection_table_size = 0;
+    for (size_t i = 0; i < selects.condition_num; i++) {
+        const Condition &condition = selects.conditions[i];
+        if ((condition.left_is_attr == 1 && condition.right_is_attr == 1)) {
+            if (::match_table(selects, condition.left_attr.relation_name, selects.relations) &&
+                ::match_table(selects, condition.right_attr.relation_name, selects.relations)) {      // 左右都是属性名，并且表名都符合
+                Table *table_left = DefaultHandler::get_default().find_table(db, condition.left_attr.relation_name);
+                const FieldMeta *field_left = table_left->table_meta().field(condition.left_attr.attribute_name);
+                Table *table_right = DefaultHandler::get_default().find_table(db, condition.right_attr.relation_name);
+                const FieldMeta *field_right = table_right->table_meta().field(condition.right_attr.attribute_name);
+                if (field_left->type() != field_right->type()) {
+                    return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+                }
+
+                int left_offset = -1, right_offset = -1, offset = 0;
+                for (int i = 0; i < tuple_set.schema().fields().size(); i++) {
+                    TupleField tuple_field = tuple_set.schema().field(i);
+                    if (::strcmp(tuple_field.table_name(), table_left->name()) == 0 &&
+                        ::strcmp(tuple_field.field_name(), field_left->name()) == 0 &&
+                        tuple_field.type() == field_left->type()) {
+                        left_offset = offset;
+                    } else if (::strcmp(tuple_field.table_name(), table_right->name()) == 0 &&
+                               ::strcmp(tuple_field.field_name(), field_right->name()) == 0 &&
+                               tuple_field.type() == field_right->type()) {
+                        right_offset = offset;
+                    }
+                    offset += tuple_set.get(0).get(i).size();
+                }
+
+                connection_table_size = offset;
+
+                if (left_offset == -1 || right_offset == -1) {
+                    return RC::GENERIC_ERROR;
+                }
+
+                DefaultConditionFilter *condition_filter = new DefaultConditionFilter();        // TODO delete
+                ConDesc left = {true, tuple_set.get(0).size(), left_offset, nullptr};
+                ConDesc right = {true, tuple_set.get(0).size(), right_offset, nullptr};
+                RC rc = condition_filter->init(left, right, field_left->type(), condition.comp);
+
+                // 不存在的属性return
+
+                if (rc != RC::SUCCESS) {
+                    delete condition_filter;
+                    for (DefaultConditionFilter *&filter: condition_filters) {
+                        delete filter;
+                    }
+                    return rc;
+                }
+                condition_filters[condition_filters_count++] = condition_filter;
+            } else {
+                return RC::GENERIC_ERROR;
+            }
+        }
+    }
+
+
+    CompositeConditionFilter compositeConditionFilter;
+    compositeConditionFilter.init((const ConditionFilter**)condition_filters, condition_filters_count);
+    for(std::vector<Tuple>::const_iterator it = tuple_set.tuples().begin(); it != tuple_set.tuples().end(); ){
+      char* data = new char[connection_table_size];
+      auto& set = it->values();
+      size_t offset = 0;
+      for (int i = 0; i < set.size(); i++) {
+          memcpy(data + offset, set[i]->to_string().c_str(), set[i]->size());
+          offset += set[i]->size();
+      }
+
+      Record record = make_virtual_record(data);
+
+      if (!compositeConditionFilter.filter(record)) {
+          it = tuple_set.remove(it);
+      } else {
+          it++;
+      }
+    }
+
+    // clear condition_filters
+
   } else {
     tuple_set = std::move(tuple_sets.front());
+  }
+
+  // group by
+
+  // aggregation
+
+  // order by
+
+	// 去除表中多余属性
+	for (int i = selects.attr_num - 1; i >= 0; i--) {
+	    const RelAttr &attr = selects.attributes[i];
+	    if (nullptr == attr.relation_name) {
+	        if (0 == strcmp("*", attr.attribute_name)) {
+	            // 这张表的所有属性
+	            continue;
+	        }
+	    } else {
+
+      }
+	}
+
+  // print/子查询
+  if (tuple_sets.size() > 1) {
+    tuple_set.print(ss, true);
+  } else {
     tuple_set.print(ss, false);
   }
 
@@ -314,9 +432,14 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
   return rc;
 }
 
-bool match_table(const Selects &selects, const char *table_name_in_condition, const char *table_name_to_match) {
-  if (table_name_in_condition != nullptr) {
-    return 0 == strcmp(table_name_in_condition, table_name_to_match);
+bool match_table(const Selects &selects, const char *table_name_in_condition,  const char* const *table_name_to_match){
+    if (table_name_in_condition != nullptr) {
+      while (*table_name_to_match != nullptr) {
+          if (0 == strcmp(table_name_in_condition, *table_name_to_match)) {
+                return true;
+          }
+          table_name_to_match++;
+      }
   }
 
   return selects.relation_num == 1;
@@ -343,32 +466,33 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  for (int i = selects.attr_num - 1; i >= 0; i--) {
-    const RelAttr &attr = selects.attributes[i];
-    if (nullptr == attr.relation_name || 0 == strcmp(table_name, attr.relation_name)) {
-      if (0 == strcmp("*", attr.attribute_name)) {
+//  for (int i = selects.attr_num - 1; i >= 0; i--) {
+//    const RelAttr &attr = selects.attributes[];
+//    if (nullptr == attr.relation_name || 0 == strcmp(table_name, attr.relation_name)) {
+//      if (0 == strcmp("*", attr.attribute_name)) {
         // 列出这张表所有字段
         TupleSchema::from_table(table, schema);
-        break; // 没有校验，给出* 之后，再写字段的错误
-      } else {
-        // 列出这张表相关字段
-        RC rc = schema_add_field(table, attr.attribute_name, schema);
-        if (rc != RC::SUCCESS) {
-          return rc;
-        }
-      }
-    }
-  }
+//        break; // 没有校验，给出* 之后，再写字段的错误
+//      } else {
+//        // 列出这张表相关字段
+//        RC rc = schema_add_field(table, attr.attribute_name, schema);
+//        if (rc != RC::SUCCESS) {
+//          return rc;
+//        }
+//      }
+//    }
+//  }
 
   // 找出仅与此表相关的过滤条件, 或者都是值的过滤条件
   std::vector<DefaultConditionFilter *> condition_filters;
+  const char* table_names[] = {table_name};
   for (size_t i = 0; i < selects.condition_num; i++) {
     const Condition &condition = selects.conditions[i];
     if ((condition.left_is_attr == 0 && condition.right_is_attr == 0) || // 两边都是值
-        (condition.left_is_attr == 1 && condition.right_is_attr == 0 && match_table(selects, condition.left_attr.relation_name, table_name)) ||  // 左边是属性右边是值
-        (condition.left_is_attr == 0 && condition.right_is_attr == 1 && match_table(selects, condition.right_attr.relation_name, table_name)) ||  // 左边是值，右边是属性名
+        (condition.left_is_attr == 1 && condition.right_is_attr == 0 && match_table(selects, condition.left_attr.relation_name, table_names)) ||  // 左边是属性右边是值
+        (condition.left_is_attr == 0 && condition.right_is_attr == 1 && match_table(selects, condition.right_attr.relation_name, table_names)) ||  // 左边是值，右边是属性名
         (condition.left_is_attr == 1 && condition.right_is_attr == 1 &&
-            match_table(selects, condition.left_attr.relation_name, table_name) && match_table(selects, condition.right_attr.relation_name, table_name)) // 左右都是属性名，并且表名都符合
+            match_table(selects, condition.left_attr.relation_name, table_names) && match_table(selects, condition.right_attr.relation_name, table_names)) // 左右都是属性名，并且表名都符合
         ) {
       DefaultConditionFilter *condition_filter = new DefaultConditionFilter();
       RC rc = condition_filter->init(*table, condition);

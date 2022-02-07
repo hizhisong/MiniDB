@@ -151,16 +151,15 @@ bool DefaultConditionFilter::filter(const Record &rec) const
     {
       // 没有考虑大小端问题
       // 对int和float，要考虑字节对齐问题,有些平台下直接转换可能会跪
-      int left = *(int *)left_value;
-      int right = *(int *)right_value;
+      int left = ::atoi(left_value);
+      int right = ::atoi(right_value);
       cmp_result = left - right;
     } break;
     case FLOATS: {
-      float left = *(float *)left_value;
+      float left = *(float *)left_value;    // TODO
       float right = *(float *)right_value;
       cmp_result = (int)(left - right);
     } break;
-    break;
     default: {
     }
   }

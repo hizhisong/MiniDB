@@ -26,6 +26,8 @@ public:
   virtual ~TupleValue() = default;
 
   virtual void to_string(std::ostream &os) const = 0;
+  virtual std::string to_string() const = 0;
+  virtual size_t size() const = 0;
   virtual int compare(const TupleValue &other) const = 0;
 private:
 };
@@ -37,6 +39,14 @@ public:
 
   void to_string(std::ostream &os) const override {
     os << value_;
+  }
+
+  std::string to_string() const override {
+    return std::to_string(value_);
+  }
+
+  size_t size() const {
+      return sizeof(value_);
   }
 
   int compare(const TupleValue &other) const override {
@@ -55,6 +65,13 @@ public:
 
   void to_string(std::ostream &os) const override {
     os << value_;
+  }
+  std::string to_string() const override {
+      return std::to_string(value_);
+  }
+
+  size_t size() const {
+      return sizeof(value_);
   }
 
   int compare(const TupleValue &other) const override {
@@ -83,6 +100,14 @@ public:
     os << value_;
   }
 
+  std::string to_string() const override {
+      return value_;
+  }
+
+  size_t size() const {
+      return value_.size();
+  }
+
   int compare(const TupleValue &other) const override {
     const StringValue &string_other = (const StringValue &)other;
     return strcmp(value_.c_str(), string_other.value_.c_str());
@@ -106,6 +131,14 @@ public:
             }
         }
         os << date_str;
+    }
+
+    std::string to_string() const override {
+        return std::to_string(date_int_format_);
+    }
+
+    size_t size() const {
+        return sizeof(date_int_format_);
     }
 
     int compare(const TupleValue &other) const override {

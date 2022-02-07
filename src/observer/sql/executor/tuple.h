@@ -28,7 +28,7 @@ class Tuple {
 public:
   Tuple() = default;
 
-  Tuple(const Tuple &other);
+//  Tuple(const Tuple &other);
 
   ~Tuple();
 
@@ -115,6 +115,8 @@ public:
     fields_.clear();
   }
 
+  int index_of_field_for_same_table(const char *field_name) const;
+
   void print(std::ostream &os, bool singleTable) const;
 public:
   static void from_table(const Table *table, TupleSchema &schema);
@@ -138,6 +140,8 @@ public:
   const TupleSchema &get_schema() const;
 
   void add(Tuple && tuple);
+
+  std::vector<Tuple>::const_iterator remove(std::vector<Tuple>::const_iterator pos);
 
   void clear();
 
